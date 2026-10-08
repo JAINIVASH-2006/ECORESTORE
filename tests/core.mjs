@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {analyze,sampleSites,validateRows,defaults,budgetSelection,isCsvFile} from '../lib/ecology.ts';
+assert.equal(isCsvFile({name:'data.csv',type:'text/csv'}),true);
+assert.equal(isCsvFile({name:'data.xlsx',type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),false);
+assert.equal(validateRows(sampleSites).length,12);
+assert.throws(()=>validateRows([{...sampleSites[0],vegetation_pct:''}]),/required/);
+assert.throws(()=>validateRows([sampleSites[0],sampleSites[0]]),/duplicate/);
+assert.throws(()=>validateRows([{...sampleSites[0],latitude:91}]),/latitude/);
+assert.throws(()=>validateRows([{...sampleSites[0],observed_at:'2026-02-31'}]),/date/);
+assert.equal(analyze({...sampleSites[0],vegetation_pct:100,soil_health:100,water_stress:0,biodiversity:100,erosion_risk:0}).score,0);
+assert.equal(analyze({...sampleSites[0],vegetation_pct:0,soil_health:0,water_stress:100,biodiversity:0,erosion_risk:100}).score,100);
+assert.equal(analyze(sampleSites[0],{vegetation:100,soil:0,water:0,biodiversity:0,erosion:0}).score,78);
+assert.throws(()=>analyze(sampleSites[0],{vegetation:0,soil:0,water:0,biodiversity:0,erosion:0}),/positive/);
+const ranked=sampleSites.map(s=>analyze(s));const scenario=budgetSelection(ranked,2000000);assert.ok(scenario.spent<=2000000);assert.equal(budgetSelection(ranked,0).selected.length,0);
+const changed=analyze({...sampleSites[0],vegetation_pct:90},defaults);assert.ok(changed.score<ranked[0].score);
+const {GET}=await import('../app/api/weather/route.ts');assert.equal((await GET(new Request('http://localhost/api/weather?lat=999&lon=78'))).status,400);
+console.log('PASS: validation, missing values, duplicates, bounds, dates, score boundaries, weights, budget, dataset recomputation, weather coordinate validation');
